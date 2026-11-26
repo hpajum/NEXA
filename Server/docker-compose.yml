@@ -1,0 +1,24 @@
+# NEXA server only. AD, krouter, OpenMetadata, Cube and ClickHouse are external
+# services reached through the NEXA_* variables in .env (copy .env.example).
+services:
+  nexa-server:
+    build: .
+    env_file: .env
+    ports:
+      - "${NEXA_PORT:-8000}:${NEXA_PORT:-8000}"
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    # volumes:
+    #   - ./certs:/certs:ro   # LDAP CA file / TLS certificate (see NEXA_LDAP_CA_FILE, NEXA_TLS_*)
+    healthcheck:
+      # Switch to https:// (and disable verification) if NEXA_TLS_CERT_FILE is set.
+      test: ["CMD", "python", "-c", "import os,urllib.request as u; u.urlopen('http://127.0.0.1:'+os.environ.get('NEXA_PORT','8000')+'/healthz', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

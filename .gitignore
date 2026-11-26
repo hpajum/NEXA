@@ -1,0 +1,22 @@
+# Build output
+dist/
+bin/
+obj/
+
+# Secrets and local environment
+.env
+*.pfx
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+*.egg-info/
+
+# Editors / OS
+.vs/
+.vscode/
+.idea/
+Thumbs.db
