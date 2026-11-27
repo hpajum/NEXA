@@ -14,8 +14,7 @@
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="Button">
-          <Grid RenderTransformOrigin="0.5,0.5">
-            <Grid.RenderTransform><ScaleTransform x:Name="Scale" ScaleX="1" ScaleY="1"/></Grid.RenderTransform>
+          <Grid x:Name="ButtonRoot" RenderTransformOrigin="0.5,0.5">
             <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
                     BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="10"/>
             <Border x:Name="Hover" Background="{DynamicResource HoverOverlay}" CornerRadius="10" Opacity="0" IsHitTestVisible="False"/>
@@ -41,8 +40,9 @@
               </Trigger.ExitActions>
             </Trigger>
             <Trigger Property="IsPressed" Value="True">
-              <Setter TargetName="Scale" Property="ScaleX" Value="0.97"/>
-              <Setter TargetName="Scale" Property="ScaleY" Value="0.97"/>
+              <Setter TargetName="ButtonRoot" Property="RenderTransform">
+                <Setter.Value><ScaleTransform ScaleX="0.97" ScaleY="0.97"/></Setter.Value>
+              </Setter>
             </Trigger>
             <Trigger Property="IsKeyboardFocused" Value="True">
               <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
