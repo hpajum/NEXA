@@ -27,6 +27,12 @@ class LoginRateLimiter:
         self._pair: dict[tuple[str, str], deque[float]] = defaultdict(deque)
         self._ip: dict[str, deque[float]] = defaultdict(deque)
 
+    def reconfigure(self, max_failures: int, window_seconds: float) -> None:
+        """Apply new limits without losing the counters already collected."""
+        with self._lock:
+            self._max = max_failures
+            self._window = window_seconds
+
     def _prune(self, bucket: deque[float], now: float) -> None:
         while bucket and now - bucket[0] >= self._window:
             bucket.popleft()

@@ -30,6 +30,17 @@ class Settings(BaseSettings):
     tls_cert_file: str = ""
     tls_key_file: str = ""
 
+    # Admin panel (web). Disabled = no /admin routes and no allow-list (every AD user passes).
+    admin_enabled: bool = True
+    admin_db_path: str = "/data/nexa.db"
+    # Used once, when no admin password exists yet. Remove it from .env afterwards.
+    admin_initial_password: SecretStr = SecretStr("")
+    admin_session_ttl_seconds: int = 3600
+    # Secure cookie flag. Keep true behind HTTPS; set false only for plain-http development.
+    admin_cookie_secure: bool = True
+    # Key for encrypting secret settings stored in the database. Empty = derived from token_secret.
+    settings_key: SecretStr = SecretStr("")
+
     # Sessions
     token_secret: SecretStr
     token_ttl_seconds: int = 3600
@@ -92,6 +103,17 @@ class Settings(BaseSettings):
         if len(value.get_secret_value()) < 32:
             raise ValueError("NEXA_TOKEN_SECRET must be at least 32 characters")
         return value
+
+    @field_validator("settings_key")
+    @classmethod
+    def _strong_settings_key(cls, value: SecretStr) -> SecretStr:
+        if value.get_secret_value() and len(value.get_secret_value()) < 32:
+            raise ValueError("NEXA_SETTINGS_KEY must be empty or at least 32 characters")
+        return value
+
+    @property
+    def encryption_key_material(self) -> str:
+        return self.settings_key.get_secret_value() or self.token_secret.get_secret_value()
 
     @property
     def cors_origin_list(self) -> list[str]:

@@ -19,6 +19,7 @@ dependencies = [
     "ldap3>=2.9.1",
     "clickhouse-connect>=0.8",
     "pyjwt>=2.8",
+    "cryptography>=42",
 ]
 
 [project.optional-dependencies]
@@ -29,9 +30,13 @@ dev = [
 
 [project.scripts]
 nexa-server = "nexa_server.main:run"
+nexa-admin-password = "nexa_server.admin.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+"nexa_server.admin" = ["static/*.html", "static/assets/*", "static/assets/pages/*", "static/assets/fonts/*"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

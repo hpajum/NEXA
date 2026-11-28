@@ -61,6 +61,17 @@ def is_plausible_username(username: str) -> bool:
 class DirectoryUser:
     dn: str
     sam_account_name: str
+    display_name: str = ""
+
+
+def _attr(entry, name: str) -> str:
+    try:
+        value = entry[name].value
+    except Exception:  # attribute absent from the entry
+        return ""
+    if isinstance(value, (list, tuple)):
+        value = value[0] if value else ""
+    return str(value or "")
 
 
 class LdapAuthenticator:
@@ -97,6 +108,80 @@ class LdapAuthenticator:
 
     async def health(self) -> None:
         await asyncio.to_thread(self._health_sync)
+
+    # --- directory lookups for the admin panel ---------------------------
+
+    async def search_users(self, query: str, limit: int = 20) -> list[dict]:
+        """Prefix/substring search over AD people. Returns canonical account, name, mail, disabled."""
+        return await asyncio.to_thread(self._search_users_sync, query, limit)
+
+    async def find_user(self, login: str) -> dict | None:
+        """Exact lookup (sAMAccountName, UPN or DOMAIN\\sam). None when absent or ambiguous."""
+        return await asyncio.to_thread(self._find_user_sync, login)
+
+    def _search_users_sync(self, query: str, limit: int) -> list[dict]:
+        from ldap3 import SUBTREE
+        from ldap3.core.exceptions import LDAPException
+
+        q = escape_filter_value(extract_login_name(query))
+        if not q:
+            return []
+        limit = max(1, min(limit, 50))
+        flt = (
+            "(&(objectClass=user)(objectCategory=person)(sAMAccountName=*)"
+            f"(|(sAMAccountName={q}*)(displayName=*{q}*)(userPrincipalName={q}*)(mail={q}*)))"
+        )
+        conn = self._service_connection()
+        try:
+            conn.search(
+                self._base_dn,
+                flt,
+                search_scope=SUBTREE,
+                attributes=["sAMAccountName", "displayName", "mail", "userAccountControl"],
+                paged_size=limit,  # first page only; avoids the size-limit exception path
+            )
+            out = []
+            for entry in conn.entries[:limit]:
+                sam = _attr(entry, "sAMAccountName")
+                if not sam:
+                    continue
+                try:
+                    disabled = bool(int(_attr(entry, "userAccountControl") or 0) & 2)
+                except ValueError:
+                    disabled = False
+                out.append(
+                    {
+                        "account": canonical_account(self._domain, sam),
+                        "display_name": _attr(entry, "displayName"),
+                        "mail": _attr(entry, "mail"),
+                        "ad_disabled": disabled,
+                    }
+                )
+            return out
+        except LDAPException as exc:
+            logger.error("LDAP search failed: %s", type(exc).__name__)
+            raise DirectoryUnavailable("search failed") from exc
+        finally:
+            conn.unbind()
+
+    def _find_user_sync(self, login: str) -> dict | None:
+        from ldap3.core.exceptions import LDAPException
+
+        if not is_plausible_username(login):
+            return None
+        conn = self._service_connection()
+        try:
+            user = self._find_user(conn, extract_login_name(login))
+        except LDAPException as exc:
+            raise DirectoryUnavailable("user lookup failed") from exc
+        finally:
+            conn.unbind()
+        if user is None:
+            return None
+        return {
+            "account": canonical_account(self._domain, user.sam_account_name),
+            "display_name": user.display_name,
+        }
 
     # --- internals -------------------------------------------------------
 
@@ -141,17 +226,17 @@ class LdapAuthenticator:
             self._base_dn,
             search_filter,
             search_scope=SUBTREE,
-            attributes=["sAMAccountName"],
+            attributes=["sAMAccountName", "displayName"],
             size_limit=2,
         )
         entries = conn.entries
         if len(entries) != 1:  # none, or ambiguous -> refuse
             return None
         entry = entries[0]
-        sam = str(entry["sAMAccountName"].value or "")
+        sam = _attr(entry, "sAMAccountName")
         if not sam:
             return None
-        return DirectoryUser(dn=entry.entry_dn, sam_account_name=sam)
+        return DirectoryUser(dn=entry.entry_dn, sam_account_name=sam, display_name=_attr(entry, "displayName"))
 
     def _is_member(self, conn, user: DirectoryUser) -> bool:
         from ldap3 import SUBTREE

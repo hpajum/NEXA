@@ -55,6 +55,16 @@ async def create_session(body: SessionRequest, request: Request) -> SessionRespo
         logger.error("directory unavailable during sign-in")
         raise HTTPException(status_code=503, detail="directory unavailable")
 
+    # Admin panel allow-list: an AD account must also be enabled in the panel.
+    # (Same 403 as a missing AD group, so the client shows its existing message.)
+    if c.store is not None and not c.store.is_allowed(account):
+        c.limiter.record_success(ip, body.username)
+        logger.info("sign-in refused (not on allow-list) account=%s", account)
+        c.store.log("system", "login.denied", account, "not on the allow-list", ip)
+        raise HTTPException(status_code=403, detail="not authorized for NEXA")
+
     c.limiter.record_success(ip, body.username)
+    if c.store is not None:
+        c.store.record_login(account)
     logger.info("sign-in ok account=%s", account)
     return SessionResponse(account=account, token=c.tokens.issue(account))

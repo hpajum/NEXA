@@ -39,9 +39,14 @@ def current_account(
     if credentials is None:
         raise HTTPException(status_code=401, detail="missing token", headers={"WWW-Authenticate": "Bearer"})
     try:
-        return request.app.state.container.tokens.verify(credentials.credentials).account
+        account = request.app.state.container.tokens.verify(credentials.credentials).account
     except InvalidToken:
         raise HTTPException(status_code=401, detail="invalid token", headers={"WWW-Authenticate": "Bearer"})
+    # Disabling a user in the admin panel takes effect immediately, not when the token expires.
+    store = request.app.state.container.store
+    if store is not None and not store.is_allowed(account):
+        raise HTTPException(status_code=403, detail="not authorized for NEXA")
+    return account
 
 
 def _initial_state(account: str, body: ChatRequest) -> tuple[str, dict]:

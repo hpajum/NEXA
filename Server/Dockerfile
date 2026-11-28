@@ -9,7 +9,9 @@ COPY pyproject.toml ./
 COPY src ./src
 RUN pip install .
 
-RUN useradd --system --uid 10001 --no-create-home nexa
+RUN useradd --system --uid 10001 --no-create-home nexa \
+ && mkdir /data && chown nexa /data
+VOLUME /data
 USER nexa
 
 # Port and every other setting come from NEXA_* environment variables.

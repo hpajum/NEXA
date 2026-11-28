@@ -28,6 +28,7 @@ class Container:
     cube: CubeClient | None
     clickhouse: ClickHouseClient | None
     graph: Any = None  # compiled LangGraph, or None if the LLM is not configured
+    store: Any = None  # admin Store (allow-list, audit) or None when the panel is disabled
     closers: list = field(default_factory=list)
 
     async def aclose(self) -> None:
@@ -36,7 +37,7 @@ class Container:
                 await client.aclose()
 
 
-def build_container(s: Settings) -> Container:
+def build_container(s: Settings, store: Any = None) -> Container:
     ldap = None
     if s.ldap_configured:
         ldap = LdapAuthenticator(
@@ -115,4 +116,5 @@ def build_container(s: Settings) -> Container:
         cube=cube,
         clickhouse=ch,
         graph=graph,
+        store=store,
     )

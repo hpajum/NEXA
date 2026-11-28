@@ -10,15 +10,20 @@ services:
     read_only: true
     tmpfs:
       - /tmp
+    volumes:
+      # Admin panel database (allow-list, saved settings, audit log). Back this volume up.
+      - nexa-data:/data
     cap_drop:
       - ALL
     security_opt:
       - no-new-privileges:true
-    # volumes:
-    #   - ./certs:/certs:ro   # LDAP CA file / TLS certificate (see NEXA_LDAP_CA_FILE, NEXA_TLS_*)
+    # Also mount ./certs:/certs:ro under volumes for the LDAP CA file / TLS certificate.
     healthcheck:
       # Switch to https:// (and disable verification) if NEXA_TLS_CERT_FILE is set.
       test: ["CMD", "python", "-c", "import os,urllib.request as u; u.urlopen('http://127.0.0.1:'+os.environ.get('NEXA_PORT','8000')+'/healthz', timeout=3)"]
       interval: 30s
       timeout: 5s
       retries: 3
+
+volumes:
+  nexa-data:

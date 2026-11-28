@@ -12,9 +12,8 @@ async def healthz() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@router.get("/readyz")
-async def readyz(request: Request, response: Response) -> dict:
-    c = request.app.state.container
+async def collect_checks(c) -> dict[str, str]:
+    """Status word per dependency. Never includes URLs, credentials or exception text."""
     checks = {
         "ldap": c.ldap,
         "openmetadata": c.openmetadata,
@@ -32,6 +31,13 @@ async def readyz(request: Request, response: Response) -> dict:
         except Exception:  # status only; details stay out of the response
             report[name] = "unavailable"
     report["llm"] = "configured" if c.settings.llm_configured else "not_configured"
+    return report
+
+
+@router.get("/readyz")
+async def readyz(request: Request, response: Response) -> dict:
+    c = request.app.state.container
+    report = await collect_checks(c)
     # LDAP is mandatory for sign-in; the data connectors are optional.
     ready = report["ldap"] == "ok"
     if not ready:
